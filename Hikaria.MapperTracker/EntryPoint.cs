@@ -7,6 +7,7 @@ using TheArchive.Core.Attributes;
 [assembly: ModDefaultFeatureGroupName("MapperTracker")]
 namespace Hikaria.MapperTracker;
 
+[BepInDependency("dev.gtfomodding.gtfo-api", BepInDependency.DependencyFlags.HardDependency)]
 [BepInDependency(ArchiveMod.GUID, BepInDependency.DependencyFlags.HardDependency)]
 [BepInPlugin(PluginInfo.GUID, PluginInfo.NAME, PluginInfo.VERSION)]
 public class EntryPoint : BasePlugin, IArchiveModule

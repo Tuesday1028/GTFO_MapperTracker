@@ -19,9 +19,9 @@ namespace Hikaria.MapperTracker.Handlers
     [EnableFeatureByDefault]
     public class MapperTrackerManager : Feature
     {
-        public override string Name => "映射追踪器";
+        public override string Name => "映射生物追踪器";
 
-        public override string Group => FeatureGroups.GetOrCreate("映射追踪器");
+        public override string Group => FeatureGroups.GetOrCreate("映射生物追踪器");
 
         [FeatureConfig]
         public static MapperTrackerSettings Settings { get; set; }
@@ -48,17 +48,10 @@ namespace Hikaria.MapperTracker.Handlers
             [FSDisplayName("聚焦扫描最大距离")]
             [FSDescription("同步")]
             public float MaxDistanceFocused { get; set; } = 50f;
-            [FSDisplayName("扫描范围与正方形的近似程度")]
-            [FSDescription("同步，范围0 - 1")]
-            public float Square { get; set; } = 0.2f;
-            [FSDisplayName("X-Ray每秒更新数量")]
-            public int RaysPerSecond { get; set; } = 10000;
-            [FSDisplayName("默认X-Ray最大数量")]
-            public int RaysTotalDefault { get; set; } = 250000;
-            [FSDisplayName("聚焦X-Ray最大数量")]
-            public int RaysTotalFocused { get; set; } = 50000;
-            [FSDisplayName("起始前进距离")]
-            public float ForwardStepSize { get; set; } = 3f;
+            [FSDisplayName("默认X-Ray每秒更新数量")]
+            public int RaysPerSecondDefault { get; set; } = 75000;
+            [FSDisplayName("聚焦X-Ray每秒更新数量")]
+            public int RaysPerSecondFocused { get; set; } = 25000;
             [FSHeader("映射颜色与大小设置")]
             [FSDisplayName("地形颜色")]
             public SColor DefaultColor { get; set; } = new(0, 1f, 0.9709f, 0.1608f);
@@ -86,7 +79,7 @@ namespace Hikaria.MapperTracker.Handlers
         {
             private static void Postfix(XRayRenderer __instance)
             {
-                __instance.instanceCount = Settings.RaysTotalDefault;
+                __instance.instanceCount = 500000;
             }
         }
 
@@ -174,7 +167,7 @@ namespace Hikaria.MapperTracker.Handlers
             {
                 if (MapperTrackerController.MapperTrackerXRaysInstanceIDLookup.TryGetValue(__instance.GetInstanceID(), out var controller))
                 {
-                    __instance.mode = controller.IsLocalSyncFocused ? 1 : 0;
+                    __instance.mode = controller.IsSyncFocused ? 1 : 0;
                 }
             }
         }
@@ -211,9 +204,8 @@ namespace Hikaria.MapperTracker.Handlers
                 m_mapperTrackerXRayDataSynced.fieldOfViewFocused = Settings.FieldOfViewFocused;
                 m_mapperTrackerXRayDataSynced.maxDistanceDefault = Settings.MaxDistanceDefault;
                 m_mapperTrackerXRayDataSynced.maxDistanceFocused = Settings.MaxDistanceFocused;
-                m_mapperTrackerXRayDataSynced.square = Settings.Square;
-                m_mapperTrackerXRayDataSynced.raysPerSecond = Settings.RaysPerSecond;
-                m_mapperTrackerXRayDataSynced.raysTotalDefault = Settings.RaysTotalDefault;
+                m_mapperTrackerXRayDataSynced.raysPerSecondDefault = Settings.RaysPerSecondDefault;
+                m_mapperTrackerXRayDataSynced.raysPerSecondFocused = Settings.RaysPerSecondFocused;
 
                 SetupXRays();
 
@@ -227,38 +219,34 @@ namespace Hikaria.MapperTracker.Handlers
                 m_xRays.fieldOfView = Settings.FieldOfView;
                 m_xRays.fieldOfViewFocused = Settings.FieldOfViewFocused;
                 m_xRays.maxDistance = Settings.MaxDistanceDefault;
-                m_xRays.forwardStepSize = Settings.ForwardStepSize;
-                m_xRays.square = Settings.Square;
-                m_xRays.raysPerSecond = Settings.RaysPerSecond;
+                m_xRays.raysPerSecond = Settings.RaysPerSecondDefault;
                 m_xRays.defaultColor = Settings.DefaultColor.ToUnityColor();
                 m_xRays.defaultSize = Settings.DefaultSize;
                 m_xRays.enemyColor = Settings.EnemyColor.ToUnityColor();
                 m_xRays.enemySize = Settings.EnemySize;
                 m_xRays.interactionColor = Settings.InteractionColor.ToUnityColor();
                 m_xRays.interactionSize = Settings.InteractionSize;
-                if (m_xRays.m_renderer != null)
+                if (m_xRays.m_renderer == null)
                 {
-                    m_xRays.m_renderer.instanceCount = Settings.RaysTotalDefault;
+                    m_xRays.m_renderer = m_xRays.gameObject.GetComponent<XRayRenderer>();
                 }
             }
 
             public void UpdateXRaysStatus()
             {
-                m_statusNeedUpdate = false;
                 m_xRays.gameObject.active = m_mapperTrackerXRayStatusSynced.enabled;
-                m_xRays.fieldOfView = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.fieldOfViewFocused : m_mapperTrackerXRayDataSynced.fieldOfView;
-                m_xRays.maxDistance = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.maxDistanceFocused : m_mapperTrackerXRayDataSynced.maxDistanceDefault;
-                m_xRays.m_renderer.instanceCount = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.raysTotalFocused : m_mapperTrackerXRayDataSynced.raysTotalDefault;
+                m_xRays.fieldOfView = IsSyncFocused ? m_mapperTrackerXRayDataSynced.fieldOfViewFocused : m_mapperTrackerXRayDataSynced.fieldOfView;
+                m_xRays.maxDistance = IsSyncFocused ? m_mapperTrackerXRayDataSynced.maxDistanceFocused : m_mapperTrackerXRayDataSynced.maxDistanceDefault;
+                m_xRays.raysPerSecond = IsSyncFocused ? m_mapperTrackerXRayDataSynced.raysPerSecondFocused : m_mapperTrackerXRayDataSynced.raysPerSecondDefault;
+                m_statusNeedUpdate = false;
             }
 
             public void UpdateXRaysData()
             {
-                m_xRays.square = m_mapperTrackerXRayDataSynced.square;
-                m_xRays.fieldOfView = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.fieldOfViewFocused : m_mapperTrackerXRayDataSynced.fieldOfView;
+                m_xRays.fieldOfView = IsSyncFocused ? m_mapperTrackerXRayDataSynced.fieldOfViewFocused : m_mapperTrackerXRayDataSynced.fieldOfView;
                 m_xRays.fieldOfViewFocused = m_mapperTrackerXRayDataSynced.fieldOfViewFocused;
-                m_xRays.maxDistance = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.maxDistanceFocused : m_mapperTrackerXRayDataSynced.maxDistanceDefault;
-                m_xRays.raysPerSecond = m_mapperTrackerXRayDataSynced.raysPerSecond;
-                m_xRays.m_renderer.instanceCount = IsLocalSyncFocused ? m_mapperTrackerXRayDataSynced.raysTotalFocused : m_mapperTrackerXRayDataSynced.raysTotalDefault;
+                m_xRays.maxDistance = IsSyncFocused ? m_mapperTrackerXRayDataSynced.maxDistanceFocused : m_mapperTrackerXRayDataSynced.maxDistanceDefault;
+                m_xRays.raysPerSecond = IsSyncFocused ? m_mapperTrackerXRayDataSynced.raysPerSecondFocused : m_mapperTrackerXRayDataSynced.raysPerSecondDefault;
             }
 
             private void OnDestroy()
@@ -280,8 +268,8 @@ namespace Hikaria.MapperTracker.Handlers
                 if (m_owner.Owner.IsLocal)
                 {
                     SendMapperTrackerXRayStatus(false, false);
-                    SendMapperTrackerXRayData(Settings.FieldOfView, Settings.FieldOfViewFocused, Settings.MaxDistanceDefault, Settings.MaxDistanceFocused, 
-                        Settings.Square, Settings.RaysPerSecond, Settings.RaysTotalDefault, Settings.RaysTotalFocused);
+                    SendMapperTrackerXRayData(Settings.FieldOfView, Settings.FieldOfViewFocused, Settings.MaxDistanceDefault, Settings.MaxDistanceFocused,
+                        Settings.RaysPerSecondDefault, Settings.RaysPerSecondFocused);
                 }
             }
 
@@ -305,7 +293,7 @@ namespace Hikaria.MapperTracker.Handlers
             private void Update()
             {
                 // 排除Owner不是自身的情况
-                if (!m_isValid || !IsLocalSyncWielded || !m_owner.Owner.IsLocal)
+                if (!m_isValid || !IsWielded || !m_owner.Owner.IsLocal)
                 {
                     return;
                 }
@@ -313,9 +301,9 @@ namespace Hikaria.MapperTracker.Handlers
                 {
                     return;
                 }
-                if (IsLocalSyncFocused != IsLocalFireButtomHold)
+                if (IsSyncFocused != IsLocalFireButtomHold)
                 {
-                    m_mapperTrackerXRayStatusSynced.focus = IsLocalFireButtomHold;
+                    m_mapperTrackerXRayStatusSynced.focus = !m_mapperTrackerXRayStatusSynced.focus;
                     m_statusNeedUpdate = true;
                     m_statusNeedSync = true;
                     m_statusFocusChanged = true;
@@ -338,7 +326,7 @@ namespace Hikaria.MapperTracker.Handlers
                 // Focus状态改变后重置XRayRenderer
                 if (m_statusFocusChanged)
                 {
-                    m_xRays.m_renderer.DeallocateResources();
+                    TryClearXRays();
                     m_statusFocusChanged = false;
                 }
                 if (m_statusNeedUpdate)
@@ -352,16 +340,21 @@ namespace Hikaria.MapperTracker.Handlers
                 }
             }
 
+            private void TryClearXRays()
+            {
+                if (m_xRays.m_renderer != null)
+                {
+                    m_xRays.m_renderer.DeallocateResources();
+                }
+            }
+
             public static void ReceiveMapperXRayStatus(ulong sender, pMapperTrackerXRayStatus data)
             {
                 if (data.player.TryGetPlayer(out SNet_Player player) && player.Lookup == sender)
                 {
                     if (MapperTrackerControllerLookup.TryGetValue(sender, out var activator))
                     {
-                        if (activator.m_mapperTrackerXRayStatusSynced.focus != data.focus)
-                        {
-                            activator.m_statusFocusChanged = true;
-                        }
+                        activator.m_statusFocusChanged = activator.m_mapperTrackerXRayStatusSynced.focus != data.focus;
                         activator.m_mapperTrackerXRayStatusSynced = data;
                         activator.m_statusNeedUpdate = true;
                         activator.m_statusFocusChanged = true;
@@ -388,17 +381,15 @@ namespace Hikaria.MapperTracker.Handlers
                 NetworkAPI.InvokeEvent(typeof(pMapperTrackerXRayStatus).FullName, m_mapperTrackerXRayStatusSynced, SNet_ChannelType.GameNonCritical);
             }
 
-            public void SendMapperTrackerXRayData(float fov, float fovFocused, float maxDistanceDefault, float maxDistanceFocused, float square, 
-                int raysPerSecond, int raysTotalDefault, int raysTotalFocused)
+            public void SendMapperTrackerXRayData(float fov, float fovFocused, float maxDistanceDefault, float maxDistanceFocused, 
+                int raysPerSecondDefault, int raysPerSecondFocused)
             {
                 m_mapperTrackerXRayDataSynced.fieldOfView = fov;
                 m_mapperTrackerXRayDataSynced.fieldOfViewFocused = fovFocused;
                 m_mapperTrackerXRayDataSynced.maxDistanceDefault = maxDistanceDefault;
                 m_mapperTrackerXRayDataSynced.maxDistanceFocused = maxDistanceFocused;
-                m_mapperTrackerXRayDataSynced.square = square;
-                m_mapperTrackerXRayDataSynced.raysPerSecond = raysPerSecond;
-                m_mapperTrackerXRayDataSynced.raysTotalDefault = raysTotalDefault;
-                m_mapperTrackerXRayDataSynced.raysTotalFocused = raysTotalFocused;
+                m_mapperTrackerXRayDataSynced.raysPerSecondDefault = raysPerSecondDefault;
+                m_mapperTrackerXRayDataSynced.raysPerSecondFocused = raysPerSecondFocused;
                 NetworkAPI.InvokeEvent(typeof(pMapperTrackerXRayData).FullName, m_mapperTrackerXRayDataSynced, SNet_ChannelType.GameNonCritical);
             }
 
@@ -406,13 +397,13 @@ namespace Hikaria.MapperTracker.Handlers
 
             public static Dictionary<int, MapperTrackerController> MapperTrackerXRaysInstanceIDLookup = new();
 
-            public bool IsLocalSyncWielded => m_tool.m_isWielded;
+            public bool IsWielded => m_tool.m_isWielded;
 
-            public bool IsLocalFireButtomHold => m_tool.FireButton;
+            public bool IsLocalFireButtomHold => Input.GetKey(KeyCode.Mouse0);
 
             public bool IsSyncEnabled => m_mapperTrackerXRayStatusSynced.enabled;
 
-            public bool IsLocalSyncFocused => m_mapperTrackerXRayStatusSynced.focus;
+            public bool IsSyncFocused => m_mapperTrackerXRayStatusSynced.focus;
 
             private ItemEquippable m_tool;
 
@@ -469,13 +460,9 @@ namespace Hikaria.MapperTracker
 
         public float maxDistanceFocused = 25f;
 
-        public float square = 0.2f;
+        public int raysPerSecondDefault = 50000;
 
-        public int raysPerSecond = 10000;
-
-        public int raysTotalDefault = 200000;
-
-        public int raysTotalFocused = 50000;
+        public int raysPerSecondFocused = 10000;
 
         public pMapperTrackerXRayData()
         {
@@ -484,10 +471,8 @@ namespace Hikaria.MapperTracker
             fieldOfViewFocused = 35f;
             maxDistanceDefault = 25f;
             maxDistanceFocused = 50f;
-            square = 0.2f;
-            raysPerSecond = 10000;
-            raysTotalDefault = 300000;
-            raysTotalFocused = 50000;
+            raysPerSecondDefault = 10000;
+            raysPerSecondFocused = 50000;
         }
     }
 }
