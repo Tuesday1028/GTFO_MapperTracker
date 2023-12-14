@@ -2,7 +2,9 @@
 using BepInEx.Unity.IL2CPP;
 using TheArchive;
 using TheArchive.Core;
+using TheArchive.Core.Attributes;
 
+[assembly: ModDefaultFeatureGroupName("MapperTracker")]
 namespace Hikaria.MapperTracker;
 
 [BepInDependency(ArchiveMod.GUID, BepInDependency.DependencyFlags.HardDependency)]
